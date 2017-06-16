@@ -29,6 +29,14 @@ for some explanations.
 In the end, the scripts writes the file `results.json` to disk
 which could be submitted in this format to the competition.
 
+## Validation
+
+In `validation`, we provide a script to validate your results files 
+on known test data. Please note that all files of the test scenario has to be provided for this script.
+Example call:
+
+```python validation/validate_cli.py --result_fn results.json --test_as example_files/SAT11-INDU-TRAIN/``` 
+
 ## Contact
 
 Marius Lindauer
