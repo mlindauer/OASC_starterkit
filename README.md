@@ -37,6 +37,9 @@ Example call:
 
 ```python validation/validate_cli.py --result_fn results.json --test_as example_files/SAT11-INDU-TRAIN/``` 
 
+Add "." to your PYTHONPATH to avoid import errors, e.g., 
+```export PYTHONPATH=.//:$PYTHONPATH```
+
 ## Contact
 
 Marius Lindauer
