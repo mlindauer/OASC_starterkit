@@ -1,6 +1,6 @@
 # OASC_starterkit
 
-The Open Algorithm Selection Challenge (OASC) will take place in Summer 2017. 
+The [Open Algorithm Selection Challenge](http://www.coseal.net/open-algorithm-selection-challenge-2017-oasc/) (OASC) will take place in Summer 2017. 
 To this end, we provide here some simple scripts
 which allow newcomers to read the data into pandas
 and show an example how to generate an output file in the required format.
@@ -31,7 +31,7 @@ which could be submitted in this format to the competition.
 
 ## Validation
 
-In `validation`, we provide a script to validate your results files 
+In `validation/`, we provide a script to validate your results files 
 on known test data. Please note that all files of the test scenario has to be provided for this script.
 Example call:
 
