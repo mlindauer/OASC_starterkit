@@ -136,10 +136,10 @@ class Validator(object):
             self.logger.error("Missing predictions for %s" %(set(test_scenario.instances).difference(schedules.keys)))
             sys.exit(1)
 
-        used_time = 0
         for inst, schedule in schedules.items():
             self.logger.debug("Validate: %s on %s" % (schedule, inst))
-            
+
+            used_time = 0            
             for entry in schedule:
                 # entry was feature step/group
                 if isinstance(entry, str):
@@ -151,8 +151,10 @@ class Validator(object):
                 elif isinstance(entry,list): # algorithm
                     algo, budget = entry 
                     time = test_scenario.performance_data[algo][inst]
+                    self.logger.debug("Alloted time %f of %s vs true time %f" %(budget, algo, time))
                     used_time += min(time, budget)
                     solved = (time <= budget) and test_scenario.runstatus_data[algo][inst] == "ok"
+                self.logger.debug("Used time (so far): %f" %(used_time))
                 
                 if solved and used_time <= test_scenario.algorithm_cutoff_time:
                     stat.solved += 1
@@ -162,7 +164,7 @@ class Validator(object):
                 elif used_time > test_scenario.algorithm_cutoff_time:
                     stat.timeouts += 1
                     stat.par1 += test_scenario.algorithm_cutoff_time
-                    self.logger.debug("Timeout after %d" % (used_time))
+                    self.logger.debug("Timeout after %f (< %f)" % (test_scenario.algorithm_cutoff_time, used_time))
                     break
 
         stat.par10 = stat.par1 + 9 * \
