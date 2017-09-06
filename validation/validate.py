@@ -1,6 +1,8 @@
 import sys
 import logging
 
+import numpy as np
+
 from aslib_scenario.aslib_scenario import ASlibScenario
 
 __author__ = "Marius Lindauer"
@@ -9,13 +11,17 @@ __license__ = "BSD"
 
 class Stats(object):
 
-    def __init__(self, runtime_cutoff):
+    def __init__(self, runtime_cutoff:int,
+                 maximize:bool):
         ''' Constructor 
 
             Arguments
             ---------
             runtime_cutoff: int
                 maximal running time
+            maximize: bool
+                whether objective has to be maxmized (true)
+                or minimized (false)
         '''
         self.par1 = 0.0
         self.par10 = 0.0
@@ -23,11 +29,13 @@ class Stats(object):
         self.solved = 0
         self.unsolvable = 0
         self.presolved_feats = 0
+        
+        self.oracle_par10 = 0.0
+        self.sbs_par10 = 0.0
 
         self.runtime_cutoff = runtime_cutoff
+        self.maximize = maximize
         
-        self.selection_freq = {}
-
         self.logger = logging.getLogger("Stats")
 
     def show(self, remove_unsolvable: bool=True):
@@ -54,6 +62,8 @@ class Stats(object):
             timeouts = self.timeouts - self.unsolvable
             par1 = self.par1 - (self.unsolvable * self.runtime_cutoff)
             par10 = self.par10 - (self.unsolvable * self.runtime_cutoff * 10)
+            self.oracle_par10 = self.oracle_par10 - (self.unsolvable * self.runtime_cutoff * 10)
+            self.sbs_par10 = self.sbs_par10 - (self.unsolvable * self.runtime_cutoff * 10)
         else:
             rm_string = "not removed"
             timeouts = self.timeouts
@@ -75,32 +85,17 @@ class Stats(object):
             self.logger.info("Number of instances: %d" %(n_samples))
             self.logger.info("Average Solution Quality: %.4f" % (par1 / n_samples))
             par10 = par1
-            
-            
-        self.logger.debug("Selection Frequency")
-        for algo, n in self.selection_freq.items():
-            self.logger.debug("%s: %.2f" %(algo, n/(timeouts + self.solved)))
-            
-        return par10 / n_samples
 
-    def merge(self, stat):
-        '''
-            adds stats from another given Stats objects
-
-            Arguments
-            ---------
-            stat : Stats
-        '''
-        self.par1 += stat.par1
-        self.par10 += stat.par10
-        self.timeouts += stat.timeouts
-        self.solved += stat.solved
-        self.unsolvable += stat.unsolvable
-        self.presolved_feats += stat.presolved_feats
+        print(">>>>>>>>>>>>>>>>>>>>>")
+        self.logger.info("System: %.4f" %(par10 / n_samples))
+        self.logger.info("Oracle: %.4f" %(self.oracle_par10 / n_samples))
+        self.logger.info("SBS: %.4f" %(self.sbs_par10 / n_samples))
         
-        for algo, n in stat.selection_freq.items():
-            self.selection_freq[algo]  = self.selection_freq.get(algo, 0) + n
-
+        if self.maximize:
+            self.logger.info("Gap closed: %.4f" %((par10 - self.sbs_par10) / (self.oracle_par10 - self.sbs_par10)))
+        else:
+            self.logger.info("Gap closed: %.4f" %((self.sbs_par10 - par10) / (self.sbs_par10 - self.oracle_par10)))
+            
 class Validator(object):
 
     def __init__(self):
@@ -121,7 +116,8 @@ class Validator(object):
         if test_scenario.performance_type[0] != "runtime":
             raise ValueError("Cannot validate non-runtime scenario with runtime validation method")
         
-        stat = Stats(runtime_cutoff=test_scenario.algorithm_cutoff_time)
+        stat = Stats(runtime_cutoff=test_scenario.algorithm_cutoff_time,
+                     maximize=test_scenario.maximize[0])
 
         feature_times = False
         if test_scenario.feature_cost_data is not None and test_scenario.performance_type[0] == "runtime":
@@ -133,21 +129,39 @@ class Validator(object):
         
         # ensure that we got predictions for all test instances
         if set(test_scenario.instances).difference(schedules.keys()):
-            self.logger.error("Missing predictions for %s" %(set(test_scenario.instances).difference(schedules.keys)))
+            self.logger.error("Missing predictions for %s" %(set(test_scenario.instances).difference(schedules.keys())))
             sys.exit(1)
+            
+        stat.oracle_par10 = test_scenario.performance_data.min(axis=1).sum()
+        stat.sbs_par10 = test_scenario.performance_data.sum(axis=0).min()
 
         for inst, schedule in schedules.items():
             self.logger.debug("Validate: %s on %s" % (schedule, inst))
 
-            used_time = 0            
+            used_time = 0         
+            feature_steps_used = []   
             for entry in schedule:
-                # entry was feature step/group
-                if isinstance(entry, str):
-                    if feature_times:
-                        ftime = test_scenario.feature_cost_data[entry][inst]
-                        self.logger.debug("Used Feature time: %f" % (ftime))
-                        used_time += ftime
-                    solved = (test_scenario.feature_runstatus_data[entry][inst] == "presolved")
+                if isinstance(entry, str): 
+                    if entry in test_scenario.algorithms:
+                        algo = entry
+                        budget = np.inf
+                        time = test_scenario.performance_data[algo][inst]
+                        self.logger.debug("Alloted time %f of %s vs true time %f" %(budget, algo, time))
+                        used_time += min(time, budget)
+                        solved = (time <= budget) and test_scenario.runstatus_data[algo][inst] == "ok"
+                    elif entry in test_scenario.feature_steps:
+                        feature_steps_used.append(entry)
+                        if test_scenario.feature_group_dict[entry].get("requires") is not None:
+                            missing_f_groups = list(set(test_scenario.feature_group_dict[entry]["requires"]).difference(feature_steps_used)) 
+                            if missing_f_groups:
+                                self.logger.error("Required feature steps (%s) are missing for computing %s." %(missing_f_groups, entry))
+                        if feature_times:
+                            ftime = test_scenario.feature_cost_data[entry][inst]
+                            self.logger.debug("Used Feature time: %f" % (ftime))
+                            used_time += ftime
+                        solved = (test_scenario.feature_runstatus_data[entry][inst] == "presolved")
+                    else:
+                        self.logger.error("Schedule entry %s for %s not found in data" %(entry, inst))
                 elif isinstance(entry,list): # algorithm
                     algo, budget = entry 
                     time = test_scenario.performance_data[algo][inst]
@@ -166,6 +180,13 @@ class Validator(object):
                     stat.par1 += test_scenario.algorithm_cutoff_time
                     self.logger.debug("Timeout after %f (< %f)" % (test_scenario.algorithm_cutoff_time, used_time))
                     break
+            
+            if not solved and used_time < test_scenario.algorithm_cutoff_time:
+                self.logger.warn("Schedule ended without using all time: %f" %(test_scenario.algorithm_cutoff_time - used_time))
+                self.logger.warn("Counting as timeout")
+                stat.timeouts += 1
+                stat.par1 += test_scenario.algorithm_cutoff_time
+            
 
         stat.par10 = stat.par1 + 9 * \
             test_scenario.algorithm_cutoff_time * stat.timeouts
@@ -194,21 +215,39 @@ class Validator(object):
             test_scenario.performance_data *= -1
             self.logger.debug("Removing *-1 in performance data because of maximization")
         
-        stat = Stats(runtime_cutoff=None)
+        stat = Stats(runtime_cutoff=None, maximize=test_scenario.maximize[0])
         
         # ensure that we got predictions for all test instances
         if set(test_scenario.instances).difference(schedules.keys()):
-            self.logger.error("Missing predictions for %s" %(set(test_scenario.instances).difference(schedules.keys)))
+            self.logger.error("Missing predictions for %s" %(set(test_scenario.instances).difference(schedules.keys())))
             sys.exit(1)
         
+        if test_scenario.maximize[0]: 
+            stat.oracle_par10 = test_scenario.performance_data.max(axis=1).sum()
+            stat.sbs_par10 = test_scenario.performance_data.sum(axis=0).max()
+        else:
+            stat.oracle_par10 = test_scenario.performance_data.min(axis=1).sum()
+            stat.sbs_par10 = test_scenario.performance_data.sum(axis=0).min()
+    
         for inst, schedule in schedules.items():
-            if len(schedule) > 1:
-                self.logger.error("Validate does not support schedules for solution quality")
-                sys.exit(9)
-                
-            selected_algo = schedule[0][0]
-            perf = test_scenario.performance_data[selected_algo][inst]
             
+            for entry in schedule:
+                if isinstance(entry, str):
+                    if entry in test_scenario.algorithms:
+                        selected_algo = entry
+                        perf = test_scenario.performance_data[selected_algo][inst]
+                        break
+                    else:
+                        self.logger.debug("Skip %s" %(entry))
+                elif isinstance(entry, list):
+                    entry = entry[0] # ignore cutoff
+                    if entry in test_scenario.algorithms:
+                        selected_algo = entry
+                        perf = test_scenario.performance_data[selected_algo][inst]
+                        break
+                    else:
+                        self.logger.debug("Skip %s" %(entry))
+                
             self.logger.debug("Using %s on %s with performance %f" %(selected_algo, inst, perf))
             
             stat.par1 += perf
