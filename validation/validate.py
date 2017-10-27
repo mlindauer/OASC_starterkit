@@ -175,7 +175,7 @@ class Validator(object):
                     stat.par1 += used_time
                     self.logger.info("Solved after %f" %(used_time))
                     break
-                elif used_time > test_scenario.algorithm_cutoff_time:
+                elif used_time >= test_scenario.algorithm_cutoff_time:
                     stat.timeouts += 1
                     stat.par1 += test_scenario.algorithm_cutoff_time
                     self.logger.debug("Timeout after %f (< %f)" % (test_scenario.algorithm_cutoff_time, used_time))
