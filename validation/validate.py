@@ -35,6 +35,7 @@ class Stats(object):
 
         self.runtime_cutoff = runtime_cutoff
         self.maximize = maximize
+        self.worse_than_sbs = 0 # int counter
         
         self.logger = logging.getLogger("Stats")
 
@@ -93,8 +94,10 @@ class Stats(object):
         
         if self.maximize:
             self.logger.info("Gap closed: %.4f" %((par10 - self.sbs_par10) / (self.oracle_par10 - self.sbs_par10)))
+            self.logger.info("Gap remaining: %.4f" %((self.oracle_par10 - par10) / (self.oracle_par10 - self.sbs_par10)))
         else:
             self.logger.info("Gap closed: %.4f" %((self.sbs_par10 - par10) / (self.sbs_par10 - self.oracle_par10)))
+            self.logger.info("Gap remaining: %.4f" %((par10 - self.oracle_par10) / (self.sbs_par10 - self.oracle_par10)))
             
 class Validator(object):
 
@@ -102,7 +105,8 @@ class Validator(object):
         ''' Constructor '''
         self.logger = logging.getLogger("Validation")
 
-    def validate_runtime(self, schedules: dict, test_scenario: ASlibScenario):
+    def validate_runtime(self, schedules: dict, test_scenario: ASlibScenario,
+                         train_scenario: ASlibScenario):
         '''
             validate selected schedules on test instances for runtime
 
@@ -112,6 +116,8 @@ class Validator(object):
                 algorithm schedules per instance
             test_scenario: ASlibScenario
                 ASlib scenario with test instances
+            train_scenario: ASlibScenario
+                ASlib scenario with test instances -- required for SBS
         '''
         if test_scenario.performance_type[0] != "runtime":
             raise ValueError("Cannot validate non-runtime scenario with runtime validation method")
@@ -133,7 +139,8 @@ class Validator(object):
             sys.exit(1)
             
         stat.oracle_par10 = test_scenario.performance_data.min(axis=1).sum()
-        stat.sbs_par10 = test_scenario.performance_data.sum(axis=0).min()
+        sbs = train_scenario.performance_data.sum(axis=0).argmin()
+        stat.sbs_par10 = test_scenario.performance_data.sum(axis=0)[sbs]
 
         for inst, schedule in schedules.items():
             self.logger.debug("Validate: %s on %s" % (schedule, inst))
@@ -195,7 +202,8 @@ class Validator(object):
 
         return stat
 
-    def validate_quality(self, schedules: dict, test_scenario: ASlibScenario):
+    def validate_quality(self, schedules: dict, test_scenario: ASlibScenario,
+                         train_scenario: ASlibScenario):
         '''
             validate selected schedules on test instances for solution quality
 
@@ -205,6 +213,8 @@ class Validator(object):
                 algorithm schedules per instance
             test_scenario: ASlibScenario
                 ASlib scenario with test instances
+            train_scenario: ASlibScenario
+                ASlib scenario with test instances -- required for SBS
         '''
         if test_scenario.performance_type[0] != "solution_quality":
             raise ValueError("Cannot validate non-solution_quality scenario with solution_quality validation method")
@@ -213,6 +223,7 @@ class Validator(object):
         
         if test_scenario.maximize[0]:
             test_scenario.performance_data *= -1
+            train_scenario.performance_data *= -1
             self.logger.debug("Removing *-1 in performance data because of maximization")
         
         stat = Stats(runtime_cutoff=None, maximize=test_scenario.maximize[0])
@@ -224,10 +235,12 @@ class Validator(object):
         
         if test_scenario.maximize[0]: 
             stat.oracle_par10 = test_scenario.performance_data.max(axis=1).sum()
-            stat.sbs_par10 = test_scenario.performance_data.sum(axis=0).max()
+            sbs = train_scenario.performance_data.sum(axis=0).argmax()
+            stat.sbs_par10 = test_scenario.performance_data.sum(axis=0)[sbs]
         else:
             stat.oracle_par10 = test_scenario.performance_data.min(axis=1).sum()
-            stat.sbs_par10 = test_scenario.performance_data.sum(axis=0).min()
+            sbs = train_scenario.performance_data.sum(axis=0).argmin()
+            stat.sbs_par10 = test_scenario.performance_data.sum(axis=0)[sbs]
     
         for inst, schedule in schedules.items():
             
@@ -252,6 +265,14 @@ class Validator(object):
             
             stat.par1 += perf
             stat.solved += 1
+            if test_scenario.maximize[0]:
+                if perf < test_scenario.performance_data[sbs][inst]:
+                    stat.worse_than_sbs += 1
+                    print("%s(%.3f) vs %s (%.3f)" %(selected_algo, perf, sbs, test_scenario.performance_data[sbs][inst]))
+            else:
+                if perf > test_scenario.performance_data[sbs][inst]:
+                    stat.worse_than_sbs += 1
+                    print("%s(%.3f) vs %s (%.3f)" %(selected_algo, perf, sbs, test_scenario.performance_data[sbs][inst]))
         
         stat.show(remove_unsolvable=False)
         

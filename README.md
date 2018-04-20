@@ -35,7 +35,7 @@ In `validation/`, we provide a script to validate your results files
 on known test data. Please note that all files of the test scenario has to be provided for this script.
 Example call:
 
-```python validation/validate_cli.py --result_fn results.json --test_as example_files/SAT11-INDU-TRAIN/``` 
+```python validation/validate_cli.py --result_fn results.json --test_as example_files/SAT11-INDU-TEST/  --train_as example_files/SAT11-INDU-TRAIN/``` 
 
 Add "." to your PYTHONPATH to avoid import errors, e.g., 
 ```export PYTHONPATH=.//:$PYTHONPATH```
