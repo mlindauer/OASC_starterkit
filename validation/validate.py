@@ -92,24 +92,24 @@ class Stats(object):
         return self.sbs_par10 / self.get_n_samples(remove_unsolvable)
 
     def get_closed_gap(self, remove_unsolvable: bool) -> float:
-        par10 = self.get_par10(remove_unsolvable)
-        sbs = self.get_par10_sbs(remove_unsolvable)
-        oracle = self.get_par10_oracle(remove_unsolvable)
+        system_score = self.get_score(remove_unsolvable)
+        sbs = self.get_score_sbs(remove_unsolvable)
+        oracle = self.get_score_oracle(remove_unsolvable)
 
         if self.maximize:
-            return (par10 - sbs) / (oracle - sbs)
+            return (system_score - sbs) / (oracle - sbs)
         else:
-            return (sbs - par10) / (sbs - oracle)
+            return (sbs - system_score) / (sbs - oracle)
 
     def get_gap_remaining(self, remove_unsolvable: bool) -> float:
-        par10 = self.get_par10(remove_unsolvable)
-        sbs = self.get_par10_sbs(remove_unsolvable)
-        oracle = self.get_par10_oracle(remove_unsolvable)
+        system_score = self.get_score(remove_unsolvable)
+        sbs = self.get_score_sbs(remove_unsolvable)
+        oracle = self.get_score_oracle(remove_unsolvable)
 
         if self.maximize:
-            return (oracle - par10) / (oracle - sbs)
+            return (oracle - system_score) / (oracle - sbs)
         else:
-            return (par10 - oracle) / (sbs - oracle)
+            return (system_score - oracle) / (sbs - oracle)
 
     def show(self, remove_unsolvable: bool = True):
         """
@@ -150,9 +150,9 @@ class Stats(object):
             self.logger.info("Average Solution Quality: %.4f" % (self.get_par1(remove_unsolvable) / self.get_n_samples(remove_unsolvable)))
 
         self.logger.info(">>>>>>>>>>>>>>>>>>>>>")
-        self.logger.info("System: %.4f" % (self.get_par10(remove_unsolvable) / self.get_n_samples(remove_unsolvable)))
-        self.logger.info("Oracle: %.4f" % (self.get_par10_oracle(remove_unsolvable) / self.get_n_samples(remove_unsolvable)))
-        self.logger.info("SBS: %.4f" % (self.get_par10_sbs(remove_unsolvable) / self.get_n_samples(remove_unsolvable)))
+        self.logger.info("System: %.4f" % (self.get_score(remove_unsolvable)))
+        self.logger.info("Oracle: %.4f" % (self.get_score_oracle(remove_unsolvable)))
+        self.logger.info("SBS: %.4f" % (self.get_score_sbs(remove_unsolvable)))
 
         self.logger.info("Gap closed: %.4f" % self.get_closed_gap(remove_unsolvable))
         self.logger.info("Gap remaining: %.4f" % self.get_gap_remaining(remove_unsolvable))
@@ -345,3 +345,4 @@ class Validator(object):
         stat.show(remove_unsolvable=False)
 
         return stat
+
