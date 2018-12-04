@@ -7,6 +7,8 @@ from aslib_scenario.aslib_scenario import ASlibScenario
 
 __author__ = "Marius Lindauer, Jan N. van Rijn"
 __license__ = "BSD"
+
+
 # this is modified version of the validation script from AutoFolio
 
 class Stats(object):
@@ -65,16 +67,15 @@ class Stats(object):
 
     def get_par10_sbs(self, remove_unsolvable: bool) -> float:
         if remove_unsolvable:
-            self.sbs_par10 = self.sbs_par10 - (self.unsolvable * self.runtime_cutoff * 10)
+            return self.sbs_par10 - (self.unsolvable * self.runtime_cutoff * 10)
         else:
             return self.sbs_par10
 
     def get_par1(self, remove_unsolvable: bool) -> float:
         if remove_unsolvable and self.runtime_cutoff:
-            par1 = self.par1 - (self.unsolvable * self.runtime_cutoff)
+            return self.par1 - (self.unsolvable * self.runtime_cutoff)
         else:
-            par1 = self.par1
-        return par1
+            return self.par1
 
     def get_score(self, remove_unsolvable: bool) -> float:
         if self.runtime_cutoff:
@@ -309,6 +310,7 @@ class Validator(object):
                 raise ValueError('Found empty schedule for instance %s' % inst)
             for entry in schedule:
                 if isinstance(entry, str):
+                    print('entry is str')
                     if entry in test_scenario.algorithms:
                         selected_algo = entry
                         perf = test_scenario.performance_data[selected_algo][inst]
@@ -344,4 +346,3 @@ class Validator(object):
         stat.show(remove_unsolvable=False)
 
         return stat
-
