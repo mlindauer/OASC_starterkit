@@ -41,13 +41,13 @@ class Stats(object):
 
         self.logger = logging.getLogger("Stats")
 
-    def get_time_outs(self, remove_unsolvable: bool) -> float:
+    def get_time_outs(self, remove_unsolvable: bool) -> int:
         if remove_unsolvable and self.runtime_cutoff:
             return self.timeouts - self.unsolvable
         else:
             return self.timeouts
 
-    def get_n_samples(self, remove_unsolvable: bool) -> float:
+    def get_n_samples(self, remove_unsolvable: bool) -> int:
         if self.runtime_cutoff:
             return self.get_time_outs(remove_unsolvable) + self.solved
         else:
@@ -99,7 +99,7 @@ class Stats(object):
         if self.maximize:
             return (par10 - sbs) / (oracle - sbs)
         else:
-            return (sbs - par10) - (sbs - oracle)
+            return (sbs - par10) / (sbs - oracle)
 
     def get_gap_remaining(self, remove_unsolvable: bool) -> float:
         par10 = self.get_par10(remove_unsolvable)
@@ -310,7 +310,6 @@ class Validator(object):
                 raise ValueError('Found empty schedule for instance %s' % inst)
             for entry in schedule:
                 if isinstance(entry, str):
-                    print('entry is str')
                     if entry in test_scenario.algorithms:
                         selected_algo = entry
                         perf = test_scenario.performance_data[selected_algo][inst]
